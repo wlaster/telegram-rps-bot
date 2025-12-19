@@ -8,6 +8,13 @@ import threading
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 
+# Соответствие эмодзи → выбор
+emoji_to_choice = {
+    '✊': 'камень',
+    '✌️': 'ножницы',
+    '✋': 'бумага'
+}
+
 # Эмодзи для отображения
 choice_to_emoji = {
     'камень': '✊',
@@ -18,7 +25,7 @@ choice_to_emoji = {
 # Глобальная статистика (по пользователям)
 stats = {}  # Ключ: user_id, значение: {'games': int, 'wins': int}
 
-# Функция определения победителя (только текст результата)
+# Функция определения победителя
 def determine_winner(user_choice, bot_choice):
     if user_choice == bot_choice:
         return "⚔️ Ничья! ⚔️"
@@ -45,10 +52,10 @@ def get_stats_text(user_id):
     percent = (s['wins'] / s['games']) * 100
     return f"Игр: {s['games']}\nПобед: {s['wins']} ({percent:.1f}%)"
 
-# Основная клавиатура
+# Основная клавиатура с эмодзи
 def get_main_markup():
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    markup.add('Камень', 'Ножницы', 'Бумага')
+    markup.add('✊', '✌️', '✋')
     markup.row('Статистика', 'Сбросить статистику')
     return markup
 
@@ -57,14 +64,14 @@ def get_main_markup():
 def send_welcome(message):
     bot.reply_to(message,
                  "🎲 Привет! Давай сыграем в 'Камень-ножницы-бумага' 🎲\n"
-                 "Выберите свой вариант:",
+                 "Выберите свой жест (эмодзи):",
                  reply_markup=get_main_markup())
 
-# Обработка игрового выбора
-@bot.message_handler(func=lambda m: m.text in ['Камень', 'Ножницы', 'Бумага'])
+# Обработка выбора (по эмодзи)
+@bot.message_handler(func=lambda m: m.text in emoji_to_choice)
 def handle_choice(message):
-    user_text = message.text
-    user_choice = user_text.lower()  # 'камень', 'ножницы', 'бумага'
+    user_emoji = message.text
+    user_choice = emoji_to_choice[user_emoji]
     bot_choice = random.choice(['камень', 'ножницы', 'бумага'])
     user_id = message.from_user.id
 
