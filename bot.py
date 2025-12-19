@@ -21,10 +21,10 @@ stats = {}
 def determine_winner(user_idx, bot_idx):
     if user_idx == bot_idx:
         return "⚔️ Ничья! ⚔️", False
-    elif (user_idx + 1) % 3 == bot_idx:  # бот побеждает
-        return "😈 Бот выиграл! 😈", False
-    else:  # пользователь побеждает
+    elif (user_idx + 1) % 3 == bot_idx:  # пользователь побеждает (бот — следующий жест)
         return "🏆 Вы выиграли! 🏆", True
+    else:  # бот побеждает
+        return "😈 Бот выиграл! 😈", False
 
 # Обновление статистики
 def update_stats(user_id, won):
@@ -76,7 +76,7 @@ def handle_choice(message):
         result_text, won = determine_winner(user_idx, bot_idx)
         update_stats(user_id, won)
 
-        time.sleep(1.5)  # Задержка перед результатом
+        time.sleep(1)  # Задержка перед результатом
         bot.send_message(chat_id, result_text, reply_markup=get_main_markup())
 
     threading.Thread(target=send_bot_choice_and_result).start()
