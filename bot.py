@@ -18,7 +18,7 @@ choice_to_emoji = {
 # Глобальная статистика (по пользователям)
 stats = {}  # Ключ: user_id, значение: {'games': int, 'wins': int}
 
-# Функция определения победителя
+# Функция определения победителя (только текст результата)
 def determine_winner(user_choice, bot_choice):
     if user_choice == bot_choice:
         return "⚔️ Ничья! ⚔️"
@@ -68,13 +68,13 @@ def handle_choice(message):
     bot_choice = random.choice(['камень', 'ножницы', 'бумага'])
     user_id = message.from_user.id
 
-    # Немедленно отправляем выбор бота (эмодзи)
-    bot.reply_to(message, f"Бот выбрал: {choice_to_emoji[bot_choice]}")
+    # Немедленно отправляем только эмодзи бота
+    bot.reply_to(message, choice_to_emoji[bot_choice])
 
-    # Определяем результат
+    # Определяем результат и обновляем статистику
     if user_choice == bot_choice:
         result_text = determine_winner(user_choice, bot_choice)
-        won = False  # ничья не считается победой
+        won = False
     elif (user_choice == 'камень' and bot_choice == 'ножницы') or \
          (user_choice == 'ножницы' and bot_choice == 'бумага') or \
          (user_choice == 'бумага' and bot_choice == 'камень'):
@@ -86,13 +86,10 @@ def handle_choice(message):
 
     update_stats(user_id, won)
 
-    # Через 1.5 секунды отправляем результат
+    # Через 1.5 секунды отправляем только результат
     def send_result():
         time.sleep(1.5)
-        final_msg = (f"Вы: {user_text} {choice_to_emoji[user_choice]}\n"
-                     f"Бот: {bot_choice.capitalize()} {choice_to_emoji[bot_choice]}\n\n"
-                     f"{result_text}")
-        bot.send_message(message.chat.id, final_msg, reply_markup=get_main_markup())
+        bot.send_message(message.chat.id, result_text, reply_markup=get_main_markup())
 
     threading.Thread(target=send_result).start()
 
