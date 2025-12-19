@@ -53,22 +53,31 @@ def handle_choice(message):
     user_choice = emoji_to_choice[user_emoji]
     bot_choice = random.choice(['камень', 'ножницы', 'бумага'])
     
-    # Анимация в отдельном потоке
-    def play_animation():
-        # Отправляем GIF-анимацию (динамичные кулаки)
-        animation_url = "https://cdn.dribbble.com/userupload/23306378/file/original-715b01478a663e164717ffa7305240ae.gif"
-        bot.send_animation(message.chat.id, animation_url, caption="Раз... Два... Три!")
+    # Анимация countdown в отдельном потоке
+    def send_countdown_animation():
+        # Отправляем начальное сообщение
+        countdown_msg = bot.reply_to(message, "Раз...")
         
-        time.sleep(3)  # Пауса для просмотра анимации
+        time.sleep(1)
+        bot.edit_message_text(chat_id=message.chat.id, 
+                              message_id=countdown_msg.message_id, 
+                              text="Раз... Два...")
         
-        # Отправка результата
+        time.sleep(1)
+        bot.edit_message_text(chat_id=message.chat.id, 
+                              message_id=countdown_msg.message_id, 
+                              text="Раз... Два... Три!")
+        
+        time.sleep(1)
+        
+        # Отправка результата отдельным сообщением
         result = determine_winner(user_choice, bot_choice)
         response = (f"Вы: {user_emoji}\n"
                     f"Бот: {choice_to_emoji[bot_choice]}\n\n"
                     f"{result}")
         bot.send_message(message.chat.id, response)
     
-    threading.Thread(target=play_animation).start()
+    threading.Thread(target=send_countdown_animation).start()
 
 # Запуск бота
 if __name__ == '__main__':
