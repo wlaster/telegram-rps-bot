@@ -99,4 +99,4 @@ def reset_stats(message):
 # Запуск бота
 if __name__ == '__main__':
     print("Бот запущен...")
-    bot.infinity_polling()
+    bot.infinity_polling(skip_pending=True, interval=1, timeout=20)
