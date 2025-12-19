@@ -2,30 +2,17 @@ import telebot
 import random
 import os
 import time
-import threading
+from flask import Flask, request, abort
 
-# Токен из переменных окружения
+# Токен и бот
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 
-# Соответствие эмодзи → выбор
-emoji_to_choice = {
-    '✊': 'камень',
-    '✌️': 'ножницы',
-    '✋': 'бумага'
-}
+# Соответствия и статистика (как в вашей версии)
+emoji_to_choice = {'✊': 'камень', '✌️': 'ножницы', '✋': 'бумага'}
+choice_to_emoji = {'камень': '✊', 'ножницы': '✌️', 'бумага': '✋'}
+stats = {}
 
-# Эмодзи для отображения
-choice_to_emoji = {
-    'камень': '✊',
-    'ножницы': '✌️',
-    'бумага': '✋'
-}
-
-# Глобальная статистика (по пользователям)
-stats = {}  # Ключ: user_id, значение: {'games': int, 'wins': int}
-
-# Функция определения победителя
 def determine_winner(user_choice, bot_choice):
     if user_choice == bot_choice:
         return "⚔️ Ничья! ⚔️"
@@ -36,38 +23,28 @@ def determine_winner(user_choice, bot_choice):
     else:
         return "😈 Бот выиграл! 😈"
 
-# Обновление статистики
 def update_stats(user_id, won):
     if user_id not in stats:
         stats[user_id] = {'games': 0, 'wins': 0}
     stats[user_id]['games'] += 1
-    if won:
-        stats[user_id]['wins'] += 1
+    if won: stats[user_id]['wins'] += 1
 
-# Получение строки статистики
 def get_stats_text(user_id):
     s = stats.get(user_id, {'games': 0, 'wins': 0})
-    if s['games'] == 0:
-        return "Статистика пуста."
+    if s['games'] == 0: return "Статистика пуста."
     percent = (s['wins'] / s['games']) * 100
     return f"Игр: {s['games']}\nПобед: {s['wins']} ({percent:.1f}%)"
 
-# Основная клавиатура с эмодзи
 def get_main_markup():
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     markup.add('✊', '✌️', '✋')
     markup.row('Статистика', 'Сбросить статистику')
     return markup
 
-# Команда /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message,
-                 "🎲 Привет! Давай сыграем в 'Камень-ножницы-бумага' 🎲\n"
-                 "Выберите свой жест (эмодзи):",
-                 reply_markup=get_main_markup())
+    bot.reply_to(message, "🎲 Привет! Давай сыграем в 'Камень-ножницы-бумага' 🎲\nВыберите свой жест (эмодзи):", reply_markup=get_main_markup())
 
-# Обработка выбора (по эмодзи)
 @bot.message_handler(func=lambda m: m.text in emoji_to_choice)
 def handle_choice(message):
     user_emoji = message.text
@@ -75,38 +52,22 @@ def handle_choice(message):
     bot_choice = random.choice(['камень', 'ножницы', 'бумага'])
     user_id = message.from_user.id
 
-    # Немедленно отправляем только эмодзи бота
     bot.reply_to(message, choice_to_emoji[bot_choice])
 
-    # Определяем результат и обновляем статистику
-    if user_choice == bot_choice:
-        result_text = determine_winner(user_choice, bot_choice)
-        won = False
-    elif (user_choice == 'камень' and bot_choice == 'ножницы') or \
-         (user_choice == 'ножницы' and bot_choice == 'бумага') or \
-         (user_choice == 'бумага' and bot_choice == 'камень'):
-        result_text = determine_winner(user_choice, bot_choice)
-        won = True
-    else:
-        result_text = determine_winner(user_choice, bot_choice)
-        won = False
+    won = (user_choice == 'камень' and bot_choice == 'ножницы') or \
+          (user_choice == 'ножницы' and bot_choice == 'бумага') or \
+          (user_choice == 'бумага' and bot_choice == 'камень')
+    if user_choice == bot_choice: won = False
 
     update_stats(user_id, won)
 
-    # Через 1.5 секунды отправляем только результат
-    def send_result():
-        time.sleep(1.5)
-        bot.send_message(message.chat.id, result_text, reply_markup=get_main_markup())
+    time.sleep(1.5)
+    bot.send_message(message.chat.id, determine_winner(user_choice, bot_choice), reply_markup=get_main_markup())
 
-    threading.Thread(target=send_result).start()
-
-# Кнопка Статистика
 @bot.message_handler(func=lambda m: m.text == 'Статистика')
 def show_stats(message):
-    user_id = message.from_user.id
-    bot.reply_to(message, get_stats_text(user_id), reply_markup=get_main_markup())
+    bot.reply_to(message, get_stats_text(message.from_user.id), reply_markup=get_main_markup())
 
-# Кнопка Сбросить статистику
 @bot.message_handler(func=lambda m: m.text == 'Сбросить статистику')
 def reset_stats(message):
     user_id = message.from_user.id
@@ -116,7 +77,23 @@ def reset_stats(message):
     else:
         bot.reply_to(message, "Статистика уже пуста.", reply_markup=get_main_markup())
 
-# Запуск бота (polling)
+# Flask для webhooks
+app = Flask(__name__)
+
+@app.route('/' + TOKEN, methods=['POST'])
+def webhook():
+    json_update = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_update)
+    bot.process_new_updates([update])
+    return '', 200
+
+@app.route('/')
+def set_webhook():
+    bot.remove_webhook()
+    time.sleep(1)
+    url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}"
+    bot.set_webhook(url=url)
+    return "Webhook установлен", 200
+
 if __name__ == '__main__':
-    print("Бот запущен...")
-    bot.infinity_polling()
+    app.run(host='0.0.0.0', port=os.getenv('PORT', 10000))
